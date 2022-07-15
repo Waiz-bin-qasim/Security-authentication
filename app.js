@@ -1,10 +1,11 @@
-const md5 = require('md5') //to apply hashing function called md5
+const bcrypt = require('bcrypt') //to apply hashing and salting function called bcrypt
 const express = require('express')
 const bodyparser = require('body-parser')
 const ejs = require('ejs')
 const mongoose = require('mongoose')
 const app = express()
 const port = 3000
+const saltRounds = 10;
 app.use(express.static("public"))
 app.set("engine view", 'ejs')
 app.use(bodyparser.urlencoded({ extended: true }))
@@ -27,29 +28,32 @@ app.get("/register", (req, res) => {
 })
 
 app.post("/register", (req, res) => {
-    const user = new Account({
-        email: req.body.username,
-        password: md5(req.body.password) //->applying hashing function to password 
-    })
-    user.save((err) => {
-        if (err) {
-            res.send(err);
-        } else {
-            res.render(__dirname + "/views/secrets.ejs")
-        }
-    })
+    bcrypt.hash(req.body.password, saltRounds, function(err, hash) { //->applying hashing and salting function to password
+        const user = new Account({
+            email: req.body.username,
+            password: hash
+        })
+        user.save((err) => {
+            if (err) {
+                res.send(err);
+            } else {
+                res.render(__dirname + "/views/secrets.ejs")
+            }
+        })
+    });
 })
 app.post('/login', (req, res) => {
     Account.findOne({
         email: req.body.username,
     }, (err, result) => {
         if (!err) {
-            if (result.password === md5(req.body.password)) { //->applying hashing function to the password to match both of them 
-                res.render(__dirname + "/views/secrets.ejs");
-            } else {
-                console.log()
-                res.redirect("/login");
-            }
+            bcrypt.compare(req.body.password, result.password, function(err, resu) { // checking the both salted hashed password are same or not
+                if (resu == true) {
+                    res.render(__dirname + '/views/secrets.ejs');
+                } else {
+                    res.render(__dirname + '/views/login.ejs')
+                }
+            });
         } else {
             res.send(err);
         }
